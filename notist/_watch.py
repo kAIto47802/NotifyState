@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import builtins
 import functools
 import inspect
 import linecache
@@ -91,15 +92,15 @@ class Watch(ContextDecorator, AbstractContextManager):
         self._start = datetime.now()
         if self._lazy_init_fn:
             self._lazy_init_fn()
-        if not self._is_fn and self._params and self._send.verbose:
-            _log.warn(
-                "Parameters can only be captured when used as a decorator "
-                "on a function. Ignoring 'params' argument."
-            )
+
+        caller_frame = (f0 := inspect.currentframe()) and f0.f_back
 
         # If it is used as a decorator on async functions, callsite info is already set
         if self._called_from is None:
-            self._set_callsite_from_frame((f0 := inspect.currentframe()) and f0.f_back)
+            self._set_callsite_from_frame(caller_frame)
+
+        if not self._is_fn and self._params:
+            self._prepare_param_vals_from_frame(caller_frame)
 
         message = f"Start watching{self._details()}"
         self._send(message)
@@ -156,6 +157,10 @@ class Watch(ContextDecorator, AbstractContextManager):
             if self._label
             else f" {fg256(45)}<{self._target}>{RESET}"
         )
+        params = (self._param_vals or None) and (
+            f"   {fg256(8)}{_G.RARROWF}{_G.RARROWF} With params: "
+            + ", ".join(f"{k}={v!r}" for k, v in self._param_vals.items())
+        )
         called_lines = (
             (LEVEL_ORDER[self._callsite_level] <= LEVEL_ORDER[level])
             and _get_called_lines_str(
@@ -170,10 +175,6 @@ class Watch(ContextDecorator, AbstractContextManager):
             assert self._defined_at is not None
             defined_at = f" {fg256(8)}{_G.RARROWF} Defined at: {fg256(12)}{self._defined_at}{RESET}"  # noqa: E501
             called_from = f" {fg256(8)}{_G.RARROWF} Called from: {fg256(12)}{self._called_from}{RESET}"  # noqa: E501
-            params = (self._param_vals or None) and (
-                f"   {fg256(8)}{_G.RARROWF}{_G.RARROWF} With params: "
-                + ", ".join(f"{k}={v!r}" for k, v in self._param_vals.items())
-            )
             return "\n".join(
                 filter(None, [target, defined_at, called_from, params, called_lines])
             )
@@ -181,7 +182,7 @@ class Watch(ContextDecorator, AbstractContextManager):
             called_from = (
                 f" {fg256(8)}{_G.RARROWF} at: {fg256(12)}{self._called_from}{RESET}"
             )
-            return "\n".join(filter(None, [target, called_from, called_lines]))
+            return "\n".join(filter(None, [target, called_from, params, called_lines]))
 
     def __call__(self, fn: _F) -> _F:
         self._is_fn = True
@@ -201,7 +202,7 @@ class Watch(ContextDecorator, AbstractContextManager):
             @functools.wraps(fn)
             def _wrapped(*args: Any, **kwargs: Any) -> Any:
                 cm = self._recreate_cm()
-                cm._prepare_param_vals(fn, args, kwargs)
+                cm._prepare_param_vals_from_args(fn, args, kwargs)
                 # Capture the callsite at coroutine creation time
                 # (i.e., where the user calls the decorated function),
                 # so it doesn't point into asyncio internals
@@ -218,14 +219,14 @@ class Watch(ContextDecorator, AbstractContextManager):
             @functools.wraps(fn)
             def _wrapped(*args: Any, **kwargs: Any) -> Any:
                 cm = self._recreate_cm()
-                cm._prepare_param_vals(fn, args, kwargs)
+                cm._prepare_param_vals_from_args(fn, args, kwargs)
                 # return super(Watch, self).__call__(fn)(*args, **kwargs)
                 with cm:
                     return fn(*args, **kwargs)
 
         return cast(_F, _wrapped)
 
-    def _prepare_param_vals(
+    def _prepare_param_vals_from_args(
         self, fn: Callable[..., Any], args: Any, kwargs: Any
     ) -> None:
         bound = inspect.signature(fn).bind(*args, **kwargs)
@@ -239,6 +240,32 @@ class Watch(ContextDecorator, AbstractContextManager):
         self._param_vals = {
             p: bound.arguments[p] for p in self._params if p in bound.arguments
         }
+
+    def _prepare_param_vals_from_frame(self, f: FrameType | None) -> None:
+        if f is None:
+            self._param_vals = {}
+            return
+
+        vals: dict[str, Any] = {}
+        missing: list[str] = []
+
+        for p in self._params:
+            if p in f.f_locals:
+                vals[p] = f.f_locals[p]
+            elif p in f.f_globals:
+                vals[p] = f.f_globals[p]
+            elif p in builtins.__dict__:
+                vals[p] = builtins.__dict__[p]
+            else:
+                missing.append(p)
+
+        if missing and self._send.verbose:
+            _log.warn(
+                f"Parameters {missing} not found in current scope. "
+                "Skipping capturing their values."
+            )
+
+        self._param_vals = vals
 
 
 class IterableWatch(AbstractContextManager, Generic[T]):
