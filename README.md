@@ -87,8 +87,6 @@ async def long_task_async() -> None:
 **Monitor blocks of code:**
 
 ```python
-import notist
-
 var1, var2 = 123, "abc"
 # You can also optionally specify params to include in the notification.
 # The values of variables with these names in the current scope are also reported
@@ -102,8 +100,6 @@ with notist.watch(params=["var1", "var2"]):
 **Monitor iterations (e.g., for loops):**
 
 ```python
-import notist
-
 for i in notist.watch(range(100), step=10):
     # This loop will be monitored, and you'll receive notifications every 10 iterations.
     ...
@@ -174,7 +170,6 @@ You can also use `notist.register` to register an existing function or method to
 **Monitor existing functions from libraries:**
 
 ```python
-import notist
 import requests
 
 # Register the `get` function from the `requests` library
@@ -187,7 +182,6 @@ response = requests.get("https://example.com/largefile.zip")
 **Monitor existing methods of classes:**
 
 ```python
-import notist
 from transformers import Trainer
 
 # Register the `train` method of the `Trainer` class
@@ -201,7 +195,6 @@ trainer.train()
 **Monitor existing methods of specific class instances:**
 
 ```python
-import notist
 from transformers import Trainer
 
 # Create a Trainer instance
