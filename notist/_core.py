@@ -376,9 +376,11 @@ def watch(
     Args:
         iterable: An iterable (e.g., a list or range) to monitor progress.
         params:
-            Names of the function parameters whose values should be included in the
-            message when the decorated function is called.
-            This option is ignored when used as a context manager.
+            Names of the parameters or variables whose values should be included in the
+            message.
+            When used as a decorator, these names are resolved against the decorated
+            function's arguments. When used as a context manager, they are resolved
+            against the current scope at the call site.
         label:
             Optional label for the watch context.
             This label will be included in both notification messages and log entries.
@@ -419,7 +421,10 @@ def watch(
 
         .. code-block:: python
 
-           with notist.watch():
+           var1, var2 = 123, "abc"
+           # You can also optionally specify params to include in the notification.
+           # The values of variables with these names in the current scope are also reported.
+           with notist.watch(params=["var1", "var2"]):
                # Code inside this block will be monitored
                # You can receive notifications when it starts, ends, or encounters an error
                ...

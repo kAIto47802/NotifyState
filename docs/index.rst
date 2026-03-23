@@ -77,9 +77,10 @@ You can use :func:`~notist._core.watch` to monitor the execution of your functio
 
 .. code-block:: python
 
-   import notist
-
-   with notist.watch():
+   var1, var2 = 123, "abc"
+   # You can also optionally specify params to include in the notification.
+   # The values of variables with these names in the current scope are also reported
+   with notist.watch(params=["var1", "var2"]):
        # Code inside this block will be monitored
        # You can receive notifications when it starts, ends, or encounters an error
        ...
@@ -165,7 +166,6 @@ You can also use :func:`~notist._core.register` to register an existing function
 
 .. code-block:: python
 
-   import notist
    import requests
 
    # Register the `get` function from the `requests` library
@@ -178,7 +178,6 @@ You can also use :func:`~notist._core.register` to register an existing function
 
 .. code-block:: python
 
-   import notist
    from transformers import Trainer
 
    # Register the `train` method of the `Trainer` class
@@ -192,7 +191,6 @@ You can also use :func:`~notist._core.register` to register an existing function
 
 .. code-block:: python
 
-   import notist
    from transformers import Trainer
 
    # Create a Trainer instance
