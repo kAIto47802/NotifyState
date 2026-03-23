@@ -79,7 +79,10 @@ You can use :func:`~notist._core.watch` to monitor the execution of your functio
 
    import notist
 
-   with notist.watch():
+   var1, var2 = 123, "abc"
+   # You can also optionally specify params to include in the notification.
+   # The values of variables with these names in the current scope are also reported
+   with notist.watch(params=["var1", "var2"]):
        # Code inside this block will be monitored
        # You can receive notifications when it starts, ends, or encounters an error
        ...
